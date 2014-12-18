@@ -106,6 +106,30 @@ func (g *Group) scanStruct(realval reflect.Value, sfield *reflect.StructField) e
 		// Dive deep into structs or pointers to structs
 		kind := field.Type.Kind()
 
+		// Interfaces can contain structs, but take some work to decompose
+		if kind == reflect.Interface {
+			// fieldVal.Kind() is interface, but this hack gives the underlying type
+			fieldVal := reflect.ValueOf(realval.Field(i).Interface())
+			kind := fieldVal.Kind()
+			if kind == reflect.Struct {
+				err := g.scanStruct(fieldVal, &field)
+
+				if err != nil {
+					return err
+				}
+
+			} else if kind == reflect.Ptr &&
+				fieldVal.Elem().Kind() == reflect.Struct &&
+				!fieldVal.IsNil() {
+				err := g.scanStruct(reflect.Indirect(fieldVal),
+					&field)
+
+				if err != nil {
+					return err
+				}
+			}
+		}
+
 		if kind == reflect.Struct {
 			err := g.scanStruct(realval.Field(i), &field)
 
